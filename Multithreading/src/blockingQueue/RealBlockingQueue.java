@@ -5,9 +5,9 @@ import java.util.NoSuchElementException;
 public class RealBlockingQueue<E> implements BlockingQueue<E> {
 
 	private int numberOfElem;
-	private int max;
-	private Element<E> first;
-	private Element<E> last;
+	public final int max;
+	private volatile Element<E> first;
+	private volatile Element<E> last;
 	
 	private static class Element<E> {
 		private E elem;
@@ -19,14 +19,10 @@ public class RealBlockingQueue<E> implements BlockingQueue<E> {
 		}
 	}
 	
-	public RealBlockingQueue() {
+	public RealBlockingQueue(int max) {
 		first = null;
 		last = null;
 		numberOfElem = 0;
-	}
-	
-	public RealBlockingQueue(int max) {
-		this();
 		this.max = max;
 	}
 	
@@ -34,8 +30,15 @@ public class RealBlockingQueue<E> implements BlockingQueue<E> {
 		return first == null;
 	}
 	
-	public int size() {
-		return numberOfElem;
+	public void add(E e) {
+		Element<E> oldLast = last;
+		last = new Element<E> (e);
+		if (isEmpty()) {
+			first = last;
+		} else {
+			oldLast.next = last;
+		}
+		numberOfElem ++;
 	}
 	
 	@Override
@@ -47,17 +50,17 @@ public class RealBlockingQueue<E> implements BlockingQueue<E> {
 				e1.printStackTrace();
 			}
 		}
-		Element<E> oldLast = last;
-		last = new Element<E> (e);
-		if (isEmpty()) {
-			first = last;
-		} else {
-			oldLast.next = last;
-		}
-		numberOfElem ++;
+		add(e);
 		notifyAll();
 	}
 
+	public E remove(){
+		E temp = first.elem;
+		first = first.next;
+		numberOfElem --;
+		return temp;
+	}
+	
 	@Override
 	public synchronized E poll() throws NoSuchElementException {
 		while (isEmpty()) {
@@ -67,11 +70,10 @@ public class RealBlockingQueue<E> implements BlockingQueue<E> {
 				e.printStackTrace();
 			}
 		}
-		Element<E> temp = first;
-		first = first.next;
-		numberOfElem --;
-		notifyAll();
-		return temp.elem;
+		if (!isEmpty()) {
+			notifyAll();	
+		}
+		return remove();
 	}
 
 }
