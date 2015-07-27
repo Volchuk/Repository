@@ -1,6 +1,9 @@
 package blockingQueue;
 
 import java.util.NoSuchElementException;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class RealBlockingQueue<E> implements BlockingQueue<E> {
 
@@ -8,6 +11,10 @@ public class RealBlockingQueue<E> implements BlockingQueue<E> {
 	public final int max;
 	private volatile Element<E> first;
 	private volatile Element<E> last;
+	
+	Lock lock = new ReentrantLock();
+	Condition notFull = lock.newCondition();
+	Condition notEmpty = lock.newCondition();
 	
 	private static class Element<E> {
 		private E elem;
@@ -30,7 +37,7 @@ public class RealBlockingQueue<E> implements BlockingQueue<E> {
 		return first == null;
 	}
 	
-	public void add(E e) {
+	private void add(E e) {
 		Element<E> oldLast = last;
 		last = new Element<E> (e);
 		if (isEmpty()) {
@@ -42,19 +49,25 @@ public class RealBlockingQueue<E> implements BlockingQueue<E> {
 	}
 	
 	@Override
-	public synchronized void offer(E e) {
-		if(numberOfElem == max) {
-			try {
-				this.wait();
-			} catch (InterruptedException e1) {
-				e1.printStackTrace();
+	public void offer(E e) {
+		lock.lock();
+		try {
+			while(numberOfElem == max) {
+				try {
+					notFull.await();
+					} catch (InterruptedException e1) {
+						e1.printStackTrace();
+					}
 			}
+			add(e);
+			notEmpty.signal();
 		}
-		add(e);
-		notifyAll();
+		finally {
+			lock.unlock();
+		}
 	}
 
-	public E remove(){
+	private E remove(){
 		E temp = first.elem;
 		first = first.next;
 		numberOfElem --;
@@ -62,18 +75,22 @@ public class RealBlockingQueue<E> implements BlockingQueue<E> {
 	}
 	
 	@Override
-	public synchronized E poll() throws NoSuchElementException {
-		while (isEmpty()) {
-			try {
-				this.wait();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
+	public E poll() throws NoSuchElementException {
+		lock.lock();
+		try {
+			while (isEmpty()) {
+				try {
+					notEmpty.await();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
+				notFull.signal();
+				return remove();
+		} 
+		finally {
+			lock.unlock();
 		}
-		if (!isEmpty()) {
-			notifyAll();	
-		}
-		return remove();
 	}
 
 }

@@ -2,6 +2,9 @@
 public class Lection {
 	
 	/*
+	 * one Object can hold only one lock
+	 * if Thread-1 accessed Lock for Object1
+	 * Thread-2 cannot access Lock for Object2 
 	 * 
 	main - метод, который запускает основной поток
 	остальные потоки могут создаваться в методе main

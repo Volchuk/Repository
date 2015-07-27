@@ -1,5 +1,8 @@
 package producer;
 
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 import massege.Massege;
 import blockingQueue.RealBlockingQueue;
 
@@ -7,23 +10,31 @@ public class Producer implements Runnable {
 
 	public String nameProducer;
 	public volatile static int i = 0;
-	volatile RealBlockingQueue<Massege> source;
+	public volatile RealBlockingQueue<Massege> source;
 
 	public Producer (RealBlockingQueue<Massege> queue, String name) {
 		source = queue;
 		this.nameProducer = name;
 	}
 	
+	static ReentrantReadWriteLock rwl = new ReentrantReadWriteLock();
+	private final Lock r = rwl.readLock();
+	private final Lock w = rwl.writeLock();
+	
 	@Override
 	public void run() {
+		try {
+			r.lock();
 		while (true) {
-			synchronized(source){
-			i++;
-			String s = "Thread "+this.nameProducer+" generated massege "+ i;
-			Massege newborn = new Massege(i, s);
+			r.unlock();
+			w.lock();
+			Massege newborn = new Massege(i, "Thread "+this.nameProducer+" generated massege "+ i ++);
+			w.unlock();
+			r.lock();
 			source.offer(newborn);
-			//System.out.println("NEw"+newborn.massege+" "+i);
 			}
+		} finally {
+			r.unlock();
 		}
 	}
 
